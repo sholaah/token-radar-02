@@ -1,5 +1,11 @@
 # Token Radar — token-radar-01 entry
 
+[![make.fun · token-radar-01](https://make.fun/badge/token-radar-01.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![rank](https://make.fun/badge/token-radar-01/sholaah/token-radar-02/rank.svg)](https://make.fun/bounty/token-radar-01/leaderboard?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+[![reward](https://make.fun/badge/token-radar-01/sholaah/token-radar-02/reward.svg)](https://make.fun/bounty/token-radar-01?utm_source=github&utm_medium=readme&utm_campaign=token-radar-01)
+
+Entry for the [make.fun “Build the best token launch radar” bounty](https://make.fun/bounty/token-radar-01).
+
 A token launch radar: it reads the sealed DefiLlama snapshot (`/input/snapshot.json`), ranks
 pre-token protocols by an implied token value, and hands in a static dashboard a reader can use —
 a ranked board, a detail view per protocol, filters, and a concrete farm plan for every row.
