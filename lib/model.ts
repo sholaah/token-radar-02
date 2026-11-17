@@ -392,6 +392,20 @@ function actionFor(p: SnapshotProtocol, capital: number, chain: string): string 
   return `Deposit $${capital} of USDC into ${name} on ${chain} and keep the position open.`;
 }
 
+/** The eligibility check that fits the category, done before any capital moves. */
+function verifyStepFor(p: SnapshotProtocol): string {
+  const c = (p.category ?? '').toLowerCase();
+  const name = p.name;
+  if (c.includes('lend') || c.includes('cdp') || c.includes('collateral')) return `Confirm on ${name}'s own site that the market you will supply to is live and not paused, and note its liquidation terms.`;
+  if (c.includes('dex')) return `Confirm on ${name}'s own site that the pool you will join is the canonical one linked from its app, not a look-alike pair.`;
+  if (c.includes('bridge')) return `Confirm the bridge route on ${name}'s own site and check its status page shows no pause or incident before you send funds.`;
+  if (c.includes('staking') || c.includes('restak')) return `Confirm on ${name}'s own site the unbonding period and slashing terms, and that withdrawals are currently enabled.`;
+  if (c.includes('perpetual') || c.includes('derivative')) return `Confirm on ${name}'s own site that trading is live in your region and read its liquidation and funding terms.`;
+  if (c.includes('curator') || c.includes('allocator')) return `Confirm on ${name}'s own site which vaults the curator manages and that deposits are open in the one you picked.`;
+  if (c.includes('rwa') || c.includes('stable')) return `Confirm on ${name}'s own site who may hold and redeem the asset, and whether redemption is open or waitlisted.`;
+  return `Confirm on ${name}'s own site, reached from its official listing, that deposits are open and the app is not paused.`;
+}
+
 /** The weekly qualifying action that fits the category, so the plan's rhythm matches its position. */
 function weeklyActionFor(p: SnapshotProtocol): string {
   const c = (p.category ?? '').toLowerCase();
@@ -420,6 +434,11 @@ export function farmSteps(p: SnapshotProtocol, age: number | null): FarmStep[] {
       text: `Use a fresh wallet that holds only the funds you plan to farm, and keep its seed phrase offline.`,
       cost: 'under $3 of gas for the first transaction',
       time: '5 minutes',
+    },
+    {
+      text: verifyStepFor(p),
+      cost: 'nothing to check, and never pay for eligibility',
+      time: '10 minutes',
     },
     {
       text: action,
@@ -581,6 +600,28 @@ export function boardIssue(board: BoardRow[], snapshot: Snapshot): string | null
     if (!Number.isSafeInteger(r.implied_value_usd) || r.implied_value_usd <= 0) return `${r.slug} has implied value ${r.implied_value_usd}`;
   }
   return null;
+}
+
+/** Headline figures over a finished board, for the run's own summary line. */
+export interface BoardStats {
+  top_slug: string;
+  top_implied_usd: number;
+  median_implied_usd: number;
+  total_tvl_usd: number;
+  distinct_categories: number;
+}
+
+/** The board's own statistics: its leader, its median row, its combined TVL and its category spread. */
+export function summarizeBoard(board: BoardRow[]): BoardStats {
+  const implied = board.map((r) => r.implied_value_usd).sort((a, b) => a - b);
+  const categories = new Set(board.map((r) => r.category ?? 'Other'));
+  return {
+    top_slug: board.length > 0 ? board[0]!.slug : '',
+    top_implied_usd: board.length > 0 ? board[0]!.implied_value_usd : 0,
+    median_implied_usd: implied.length > 0 ? implied[Math.floor(implied.length / 2)]! : 0,
+    total_tvl_usd: board.reduce((sum, r) => sum + r.tvl_usd, 0),
+    distinct_categories: categories.size,
+  };
 }
 
 /** A compact data.js: the dashboard's whole dataset as one script, no fetch and no network. */

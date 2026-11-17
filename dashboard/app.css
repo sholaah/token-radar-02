@@ -102,6 +102,15 @@ tbody tr[data-selected="true"] { background: color-mix(in srgb, var(--accent) 8%
 .status { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 
+.highlights { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--step-3); padding-bottom: var(--step-4); }
+.highlight {
+  display: grid; gap: 2px; text-align: left; padding: var(--step-3) var(--step-4);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-panel);
+}
+.highlight b { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.highlight .num { color: var(--accent); font-size: 14px; }
+.highlight:hover { border-color: var(--accent); }
+
 .model { margin-top: var(--step-4); padding: var(--step-5); display: grid; gap: var(--step-3); }
 .model .table-wrap { margin-top: var(--step-2); border: 1px solid var(--border); border-radius: var(--radius-control); }
 .model table caption { padding: var(--step-3); text-align: left; }
@@ -136,6 +145,7 @@ tbody tr[data-selected="true"] { background: color-mix(in srgb, var(--accent) 8%
 .cost { color: var(--muted); font-size: 12px; font-family: var(--font-num); }
 
 @media (max-width: 900px) {
+  .highlights { grid-template-columns: 1fr; }
   .shell { padding: var(--step-4); }
   .lede { grid-template-columns: 1fr; gap: var(--step-4); }
   .facts { border-left: 0; border-top: 1px solid var(--border); padding-left: 0; padding-top: var(--step-4); }

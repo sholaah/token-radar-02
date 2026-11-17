@@ -100,6 +100,7 @@
       else if (key === 'tvl') { av = a.tvl_usd; bv = b.tvl_usd; }
       else if (key === 'growth') { av = a.change_7d === null ? -Infinity : a.change_7d; bv = b.change_7d === null ? -Infinity : b.change_7d; }
       else if (key === 'age') { av = a.age_days === null ? Infinity : a.age_days; bv = b.age_days === null ? Infinity : b.age_days; }
+      else if (key === 'multiple') { av = a.multiple; bv = b.multiple; }
       else { av = a.implied_value_usd; bv = b.implied_value_usd; }
       if (av < bv) return -state.dir;
       if (av > bv) return state.dir;
@@ -133,6 +134,44 @@
     );
   }
 
+  // Three figures over the whole board, recomputed from the same rows the table shows: the
+  // leader, the week's strongest gainer, and the deepest pool. They are links into the detail
+  // drawer, so a highlight is a way into a row, not a separate claim about it.
+  function highlights() {
+    var byImplied = DATA.rows.slice().sort(function (a, b) { return b.implied_value_usd - a.implied_value_usd; });
+    var gainers = DATA.rows.filter(function (r) { return r.change_7d !== null; }).sort(function (a, b) { return b.change_7d - a.change_7d; });
+    var byTvl = DATA.rows.slice().sort(function (a, b) { return b.tvl_usd - a.tvl_usd; });
+    function card(label, row, figure) {
+      return el('button', { type: 'button', class: 'highlight', onclick: function () { openDetail(row.slug); } },
+        el('span', { class: 'sub', text: label }),
+        el('b', { text: row.name }),
+        el('span', { class: 'num', text: figure })
+      );
+    }
+    return el('section', { class: 'highlights', 'aria-label': 'Board highlights' },
+      byImplied.length ? card('Highest implied value', byImplied[0], fmtUsd(byImplied[0].implied_value_usd)) : null,
+      gainers.length ? card('Strongest 7d growth', gainers[0], fmtPct(gainers[0].change_7d)) : null,
+      byTvl.length ? card('Deepest TVL on the board', byTvl[0], fmtUsd(byTvl[0].tvl_usd)) : null
+    );
+  }
+
+  // The filtered board as a CSV download, built in the page from the rows on screen: the same
+  // figures, in a form a farmer can keep next to a farm log.
+  function exportCsv() {
+    var head = 'rank,protocol,category,chains,tvl_usd,change_7d_pct,age_days,category_multiple,implied_value_usd,watchlist';
+    var lines = sortedRows(rows()).map(function (r) {
+      function cell(v) { return '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"'; }
+      return [r.rank, cell(r.name), cell(r.category || 'Other'), cell((r.chains || []).join(' ')), r.tvl_usd, r.change_7d === null ? '' : r.change_7d, r.age_days === null ? '' : r.age_days, r.multiple, r.implied_value_usd, r.on_watchlist ? 'yes' : 'no'].join(',');
+    });
+    var blob = new Blob([head + '\n' + lines.join('\n') + '\n'], { type: 'text/csv' });
+    var url = URL.createObjectURL(blob);
+    var a = el('a', { href: url, download: 'token-radar-board.csv' });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
   function controls() {
     var categories = Array.from(new Set(DATA.rows.map(function (r) { return r.category || 'Other'; }))).sort();
     var search = el('input', { type: 'search', id: 'q', placeholder: 'Search name, category or chain', value: state.q, 'aria-label': 'Search the board' });
@@ -158,6 +197,7 @@
       el('div', { class: 'field' }, el('label', { for: 'chain', text: 'Chain' }), chainSelect),
       el('div', { class: 'field' }, el('label', { for: 'watchlist-only', text: 'Watchlist only' }), wl),
       el('div', { class: 'field' }, el('span', { class: 'sub', text: 'Token status' }), el('div', { class: 'tabs' }, pre, live)),
+      el('div', { class: 'field' }, el('span', { class: 'sub', text: 'Export' }), el('button', { class: 'button', type: 'button', text: 'Download CSV', onclick: exportCsv })),
       el('span', { class: 'count', text: state.tab === 'pre-token' ? rows().length + ' rows shown' : DATA.live.length + ' live-token protocols' })
     );
   }
@@ -199,6 +239,7 @@
         el('td', { class: 'num', text: fmtUsd(r.tvl_usd) }),
         el('td', { class: 'num ' + growthClass, text: growth }),
         el('td', { class: 'num', text: fmtAge(r.age_days) }),
+        el('td', { class: 'num', text: r.multiple.toFixed(3) + 'x' }),
         el('td', null, el('div', { class: 'implied' },
           el('div', { class: 'bar', 'aria-hidden': 'true' }, el('i', { style: 'width:' + Math.max(3, Math.round((r.implied_value_usd / max) * 100)) + '%' })),
           el('span', { class: 'num', text: fmtUsd(r.implied_value_usd) })
@@ -217,6 +258,7 @@
             sortHeader('tvl', 'TVL'),
             sortHeader('growth', '7d'),
             sortHeader('age', 'Age'),
+            sortHeader('multiple', 'Multiple'),
             sortHeader('implied', 'Implied value'),
             el('th', { scope: 'col', text: 'Token' })
           )),
@@ -331,6 +373,7 @@
     var shell = el('div', { class: 'shell' });
     shell.appendChild(header());
     shell.appendChild(lede());
+    if (state.tab === 'pre-token') shell.appendChild(highlights());
     shell.appendChild(controls());
     shell.appendChild(state.tab === 'pre-token' ? boardTable() : liveTable());
     if (state.tab === 'pre-token') shell.appendChild(modelPanel());
@@ -344,5 +387,15 @@
   render();
   window.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && dialog.open) dialog.close();
+    // Slash jumps to the search box from anywhere outside a field, the way a radar operator
+    // expects: filter first, scroll later.
+    if (e.key === '/' && !dialog.open) {
+      var tag = (document.activeElement && document.activeElement.tagName) || '';
+      if (tag !== 'INPUT' && tag !== 'SELECT' && tag !== 'TEXTAREA') {
+        e.preventDefault();
+        var q = document.getElementById('q');
+        if (q) q.focus();
+      }
+    }
   });
 })();
