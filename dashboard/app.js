@@ -7,7 +7,17 @@
   var DATA = window.RADAR;
   if (!DATA) return;
   var app = document.getElementById('board');
-  var state = { q: '', category: 'all', chain: 'all', watchlistOnly: false, tab: 'pre-token', sort: 'implied', dir: -1, selected: null };
+  var state = { q: '', category: 'all', chain: 'all', watchlistOnly: false, earlyOnly: false, ageBand: 'any', tab: 'pre-token', sort: 'implied', dir: -1, selected: null };
+
+  // The age bands the board can be cut by: a fresh launch, a young protocol, an established one.
+  // An unknown age is its own fact and matches no band but 'any'.
+  function ageMatches(days) {
+    if (state.ageBand === 'any') return true;
+    if (days === null || days === undefined) return false;
+    if (state.ageBand === 'fresh') return days < 90;
+    if (state.ageBand === 'young') return days >= 90 && days < 365;
+    return days >= 365;
+  }
 
   var usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
   function fmtUsd(n) {
@@ -87,6 +97,8 @@
       if (state.category !== 'all' && (r.category || 'Other') !== state.category) return false;
       if (state.chain !== 'all' && (r.chains || []).indexOf(state.chain) < 0) return false;
       if (state.watchlistOnly && !r.on_watchlist) return false;
+      if (state.earlyOnly && r.on_watchlist) return false;
+      if (!ageMatches(r.age_days)) return false;
       if (!q) return true;
       var hay = [r.name, r.slug, r.category, (r.chains || []).join(' ')].join(' ').toLowerCase();
       return hay.indexOf(q) >= 0;
@@ -189,6 +201,15 @@
     chainSelect.addEventListener('change', function () { state.chain = chainSelect.value; render(); });
     var wl = el('input', { type: 'checkbox', id: 'watchlist-only', checked: state.watchlistOnly ? 'checked' : null });
     wl.addEventListener('change', function () { state.watchlistOnly = wl.checked; render(); });
+    var eo = el('input', { type: 'checkbox', id: 'early-only', checked: state.earlyOnly ? 'checked' : null });
+    eo.addEventListener('change', function () { state.earlyOnly = eo.checked; render(); });
+    var ageSelect = el('select', { id: 'age-band', 'aria-label': 'Filter by age with no token' },
+      el('option', { value: 'any', text: 'Any age', selected: state.ageBand === 'any' ? 'selected' : null }),
+      el('option', { value: 'fresh', text: 'Fresh, under 90 days', selected: state.ageBand === 'fresh' ? 'selected' : null }),
+      el('option', { value: 'young', text: 'Young, 90 days to a year', selected: state.ageBand === 'young' ? 'selected' : null }),
+      el('option', { value: 'established', text: 'Established, over a year', selected: state.ageBand === 'established' ? 'selected' : null })
+    );
+    ageSelect.addEventListener('change', function () { state.ageBand = ageSelect.value; render(); });
     var pre = el('button', { type: 'button', 'aria-pressed': state.tab === 'pre-token' ? 'true' : 'false', text: 'Pre-token', onclick: function () { state.tab = 'pre-token'; render(); } });
     var live = el('button', { type: 'button', 'aria-pressed': state.tab === 'live' ? 'true' : 'false', text: 'Live token', onclick: function () { state.tab = 'live'; render(); } });
     return el('div', { class: 'controls' },
@@ -196,6 +217,8 @@
       el('div', { class: 'field' }, el('label', { for: 'category', text: 'Category' }), select),
       el('div', { class: 'field' }, el('label', { for: 'chain', text: 'Chain' }), chainSelect),
       el('div', { class: 'field' }, el('label', { for: 'watchlist-only', text: 'Watchlist only' }), wl),
+      el('div', { class: 'field' }, el('label', { for: 'early-only', text: 'Early radar only' }), eo),
+      el('div', { class: 'field' }, el('label', { for: 'age-band', text: 'Age with no token' }), ageSelect),
       el('div', { class: 'field' }, el('span', { class: 'sub', text: 'Token status' }), el('div', { class: 'tabs' }, pre, live)),
       el('div', { class: 'field' }, el('span', { class: 'sub', text: 'Export' }), el('button', { class: 'button', type: 'button', text: 'Download CSV', onclick: exportCsv })),
       el('span', { class: 'count', text: state.tab === 'pre-token' ? rows().length + ' rows shown' : DATA.live.length + ' live-token protocols' })
@@ -217,7 +240,7 @@
       return el('div', { class: 'panel' }, el('div', { class: 'empty' },
         el('h2', { text: 'No protocol matches that filter' }),
         el('p', { text: 'Clear the search or pick another category to see the board again.' }),
-        el('button', { class: 'button primary', type: 'button', text: 'Clear filters', onclick: function () { state.q = ''; state.category = 'all'; state.chain = 'all'; state.watchlistOnly = false; writeHash(); render(); } })
+        el('button', { class: 'button primary', type: 'button', text: 'Clear filters', onclick: function () { state.q = ''; state.category = 'all'; state.chain = 'all'; state.watchlistOnly = false; state.earlyOnly = false; state.ageBand = 'any'; writeHash(); render(); } })
       ));
     }
     var max = list[0].implied_value_usd || 1;

@@ -10,6 +10,10 @@
 // page and the board can never drift apart. The board covers the whole watchlist, adds the early
 // pre-token protocols below its floor, states the model, and gives every protocol a farm plan.
 //
+// A finished board can be checked against its snapshot without writing anything:
+//   node main.ts --verify out/board.json --input ../input/snapshot.json
+// exits 0 when the file is exactly the model's board, and names every drift when it is not.
+//
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts --input ../input/snapshot.json
 
@@ -17,6 +21,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSyn
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { boardIssue, buildRadar, dataScript, parseSnapshot, summarizeBoard } from './lib/model.ts';
+import { reportLines, verifyBoard } from './lib/verify.ts';
 import { buildDossier } from './vendor/makefun-board.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -39,6 +44,20 @@ const inputFile = inputArg.endsWith('.json') ? inputArg : join(inputArg, 'snapsh
 if (!existsSync(inputFile)) {
   process.stderr.write(`token radar: no snapshot at ${inputFile}: pass --input <snapshot.json|directory> or mount the sealed /input\n`);
   process.exit(2);
+}
+
+// Verify mode: check a finished board against the snapshot and stop. No output is written;
+// the exit code is the verdict, so a script can gate on it.
+const verifyAt = process.argv.indexOf('--verify');
+if (verifyAt >= 0) {
+  const boardFile = process.argv[verifyAt + 1];
+  if (boardFile === undefined || !existsSync(boardFile)) {
+    process.stderr.write('token radar: --verify needs the path of a board.json to check\n');
+    process.exit(2);
+  }
+  const report = verifyBoard(readFileSync(boardFile, 'utf8'), readFileSync(inputFile, 'utf8'));
+  for (const line of reportLines(report)) process.stdout.write(`${line}\n`);
+  process.exit(report.ok ? 0 : 1);
 }
 const out = arg('output', process.env.MAKEFUN_OUTPUT_DIR ?? '/output');
 
