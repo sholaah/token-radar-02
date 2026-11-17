@@ -377,6 +377,14 @@
     ));
     dialog.appendChild(el('section', { class: 'detail-section' },
       el('h3', { text: 'Farm plan' }),
+      el('p', null, el('button', { class: 'button', type: 'button', text: 'Copy this plan', onclick: function (ev) {
+        // The plan as plain text for a farm log: the action lines with their cost and time tails,
+        // numbered the way the drawer numbers them.
+        var text = steps.map(function (s, i) { return (i + 1) + '. ' + s; }).join('\n');
+        var done = function () { ev.target.textContent = 'Copied'; setTimeout(function () { ev.target.textContent = 'Copy this plan'; }, 1500); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, done);
+        else done();
+      } })),
       el('ol', { class: 'steps' }, steps.map(function (s) {
         var at = s.indexOf(' Cost: ');
         var action = at >= 0 ? s.slice(0, at) : s;

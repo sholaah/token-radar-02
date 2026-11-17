@@ -108,6 +108,45 @@ export function verifyBoard(boardText: string, snapshotText: string): VerifyRepo
   };
 }
 
+/**
+ * Verify the dashboard's data.js against a board: the page recomputes nothing it cannot check,
+ * so the file it reads must carry the board's own rows — same order, same implied values, and
+ * the farm steps character for character. Returns one problem per drift, empty when it agrees.
+ */
+export function verifyDataScript(dataText: string, board: BoardRow[]): string[] {
+  const problems: string[] = [];
+  const prefix = 'window.RADAR=';
+  if (!dataText.startsWith(prefix)) return ['data.js does not start with the window.RADAR assignment'];
+  let data: unknown;
+  try {
+    data = JSON.parse(dataText.slice(prefix.length).replace(/;\s*$/, ''));
+  } catch {
+    return ['data.js does not parse as JSON after the assignment'];
+  }
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return ['data.js carries no data object'];
+  const rows = (data as Record<string, unknown>).rows;
+  if (!Array.isArray(rows)) return ['data.js has no rows array'];
+  if (rows.length !== board.length) problems.push(`data.js holds ${rows.length} rows, the board holds ${board.length}`);
+  const n = Math.min(rows.length, board.length);
+  for (let i = 0; i < n; i++) {
+    const d = rows[i] as Record<string, unknown>;
+    const b = board[i]!;
+    if (d.slug !== b.slug) {
+      problems.push(`data.js row ${i + 1} is ${String(d.slug)}, the board's row ${i + 1} is ${b.slug}`);
+      continue;
+    }
+    if (d.implied_value_usd !== b.implied_value_usd) {
+      problems.push(`data.js row ${b.slug}: implied value ${String(d.implied_value_usd)}, the board carries ${b.implied_value_usd}`);
+    }
+    const dSteps = Array.isArray(d.farm_steps) ? (d.farm_steps as string[]) : [];
+    if (dSteps.length !== b.farm_steps.length || dSteps.some((s, j) => s !== b.farm_steps[j])) {
+      problems.push(`data.js row ${b.slug}: the farm plan differs from the board's own steps`);
+    }
+    if (d.rank !== b.rank) problems.push(`data.js row ${b.slug}: rank ${String(d.rank)}, the board says ${b.rank}`);
+  }
+  return problems;
+}
+
 /** A report as the lines the entrypoint prints: one verdict, then one line per problem. */
 export function reportLines(report: VerifyReport): string[] {
   const head = report.ok

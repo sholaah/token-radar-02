@@ -21,7 +21,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSyn
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { boardIssue, buildRadar, dataScript, parseSnapshot, summarizeBoard } from './lib/model.ts';
-import { reportLines, verifyBoard } from './lib/verify.ts';
+import { reportLines, verifyBoard, verifyDataScript } from './lib/verify.ts';
 import { buildDossier } from './vendor/makefun-board.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -55,8 +55,22 @@ if (verifyAt >= 0) {
     process.stderr.write('token radar: --verify needs the path of a board.json to check\n');
     process.exit(2);
   }
-  const report = verifyBoard(readFileSync(boardFile, 'utf8'), readFileSync(inputFile, 'utf8'));
+  const boardText = readFileSync(boardFile, 'utf8');
+  const report = verifyBoard(boardText, readFileSync(inputFile, 'utf8'));
   for (const line of reportLines(report)) process.stdout.write(`${line}\n`);
+  // When a data.js sits beside the board (a finished /output), it must agree with the board too:
+  // the dashboard reads no other file, so a stale data.js is a wrong page over a right board.
+  const dataFile = join(boardFile.slice(0, boardFile.lastIndexOf('/') + 1), 'data.js');
+  if (existsSync(dataFile)) {
+    const board = (JSON.parse(boardText) as { rows: Parameters<typeof verifyDataScript>[1] }).rows;
+    const drift = verifyDataScript(readFileSync(dataFile, 'utf8'), board);
+    if (drift.length === 0) {
+      process.stdout.write('verify: data.js agrees with the board\n');
+    } else {
+      for (const p of drift) process.stdout.write(`verify: data.js: ${p}\n`);
+      process.exit(1);
+    }
+  }
   process.exit(report.ok ? 0 : 1);
 }
 const out = arg('output', process.env.MAKEFUN_OUTPUT_DIR ?? '/output');
